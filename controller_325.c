@@ -364,15 +364,18 @@ if (strncmp(buffer, "GET ", 4) == 0)
 
 /* ===== MONITOR STARTS HERE ===== */
 
-if (strncmp(buffer, "MONITOR ", 8) == 0)
-{
-    int seconds;
 
-    if (sscanf(buffer, "MONITOR %d", &seconds) != 1 ||
-        seconds <= 0 ||
-        seconds > 60)
+if (strncmp(buffer, "MONITOR START ", 14) == 0)
+{
+    int udp_port;
+
+    if (sscanf(buffer,
+               "MONITOR START %d",
+               &udp_port) != 1 ||
+        udp_port < 1 ||
+        udp_port > 65535)
     {
-        printf("Usage: MONITOR <seconds> (1-60)\n");
+        printf("Usage: MONITOR START <udp_port>\n");
         continue;
     }
 
@@ -390,7 +393,7 @@ if (strncmp(buffer, "MONITOR ", 8) == 0)
 
     udp_addr.sin_family = AF_INET;
     udp_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    udp_addr.sin_port = htons(UDP_PORT);
+    udp_addr.sin_port = htons(udp_port);
 
     if (bind(udp_sock,
              (struct sockaddr *)&udp_addr,
@@ -401,7 +404,9 @@ if (strncmp(buffer, "MONITOR ", 8) == 0)
         continue;
     }
 
-    /* Send MONITOR command through TCP */
+    /*
+     * Send MONITOR START to Agent using TCP.
+     */
     if (send(sockfd,
              buffer,
              strlen(buffer),
@@ -412,7 +417,6 @@ if (strncmp(buffer, "MONITOR ", 8) == 0)
         break;
     }
 
-    /* Receive TCP acknowledgement */
     memset(response, 0, sizeof(response));
 
     ssize_t monitor_received =
@@ -429,39 +433,73 @@ if (strncmp(buffer, "MONITOR ", 8) == 0)
     }
 
     response[monitor_received] = '\0';
+
     printf("%s", response);
 
-    /* Receive UDP monitoring messages */
-    for (int i = 0; i < seconds; i++)
+    /*
+     * Receive one UDP monitoring packet for testing.
+     */
+    char udp_buffer[256];
+
+    memset(udp_buffer, 0, sizeof(udp_buffer));
+
+    ssize_t udp_received =
+        recvfrom(udp_sock,
+                 udp_buffer,
+                 sizeof(udp_buffer) - 1,
+                 0,
+                 NULL,
+                 NULL);
+
+    if (udp_received > 0)
     {
-        char udp_buffer[256];
-
-        memset(udp_buffer, 0, sizeof(udp_buffer));
-
-        ssize_t udp_received =
-            recvfrom(udp_sock,
-                     udp_buffer,
-                     sizeof(udp_buffer) - 1,
-                     0,
-                     NULL,
-                     NULL);
-
-        if (udp_received < 0)
-        {
-            perror("recvfrom");
-            break;
-        }
-
         udp_buffer[udp_received] = '\0';
 
         printf("[UDP] %s\n", udp_buffer);
     }
 
     close(udp_sock);
+
+    continue;
+}
+
+/* ===== MONITOR STOP ===== */
+
+if (strcmp(buffer, "MONITOR STOP") == 0)
+{
+    if (send(sockfd,
+             buffer,
+             strlen(buffer),
+             0) < 0)
+    {
+        perror("send");
+        break;
+    }
+
+    memset(response, 0, sizeof(response));
+
+    ssize_t monitor_received =
+        recv(sockfd,
+             response,
+             sizeof(response) - 1,
+             0);
+
+    if (monitor_received <= 0)
+    {
+        printf("Agent disconnected.\n");
+        break;
+    }
+
+    response[monitor_received] = '\0';
+
+    printf("%s", response);
+
     continue;
 }
 
 /* ===== MONITOR ENDS HERE ===== */
+
+
 
 
     if (send(sockfd,
