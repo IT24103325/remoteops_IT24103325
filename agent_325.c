@@ -489,9 +489,9 @@ else if (strncmp(buffer, "EXEC ", 5) == 0)
     }
 
     /*
-     * EXEC DF
+     * EXEC DISKFREE
      */
-    else if (strcmp(exec_command, "DF") == 0)
+    else if (strcmp(exec_command, "DISKFREE") == 0)
     {
         FILE *fp;
 
@@ -513,7 +513,7 @@ else if (strncmp(buffer, "EXEC ", 5) == 0)
         {
             snprintf(response,
                      sizeof(response),
-                     "OK EXEC DF\n");
+                     "OK EXEC DISKFREE\n");
 
             send(connfd,
                  response,
@@ -545,6 +545,93 @@ else if (strncmp(buffer, "EXEC ", 5) == 0)
     }
 
     /*
+     * EXEC HOSTNAME
+     */
+    else if (strcmp(exec_command, "HOSTNAME") == 0)
+    {
+        FILE *fp;
+        char output[512];
+
+        fp = popen("hostname", "r");
+
+        if (fp == NULL)
+        {
+            snprintf(response,
+                     sizeof(response),
+                     "ERR 002 INTERNAL_ERROR SID:%s\n",
+                     SID);
+        }
+        else
+        {
+            memset(output, 0, sizeof(output));
+
+            if (fgets(output, sizeof(output), fp) == NULL)
+            {
+                strcpy(output, "Unable to read hostname\n");
+            }
+
+            pclose(fp);
+
+            snprintf(response,
+                     sizeof(response),
+                     "OK EXEC HOSTNAME\n"
+                     "%s"
+                     "SID:%s\n",
+                     output,
+                     SID);
+        }
+
+        send(connfd,
+             response,
+             strlen(response),
+             0);
+    }
+
+    /*
+     * EXEC WHOAMI
+     */
+    else if (strcmp(exec_command, "WHOAMI") == 0)
+    {
+        FILE *fp;
+        char output[512];
+
+        fp = popen("whoami", "r");
+
+        if (fp == NULL)
+        {
+            snprintf(response,
+                     sizeof(response),
+                     "ERR 002 INTERNAL_ERROR SID:%s\n",
+                     SID);
+        }
+        else
+        {
+            memset(output, 0, sizeof(output));
+
+            if (fgets(output, sizeof(output), fp) == NULL)
+            {
+                strcpy(output, "Unable to read user\n");
+            }
+
+            pclose(fp);
+
+            snprintf(response,
+                     sizeof(response),
+                     "OK EXEC WHOAMI\n"
+                     "%s"
+                     "SID:%s\n",
+                     output,
+                     SID);
+        }
+
+        send(connfd,
+             response,
+             strlen(response),
+             0);
+    }
+
+
+    /*
      * Anything other than DATE, UPTIME or DF
      * is NOT allowed.
      */
@@ -567,7 +654,7 @@ else if (strncmp(buffer, "PUT ", 4) == 0)
     char filename[256];
     long file_size;
 
-    if (sscanf(buffer,
+if (sscanf(buffer,
                "PUT %255s %ld",
                filename,
                &file_size) != 2 ||
