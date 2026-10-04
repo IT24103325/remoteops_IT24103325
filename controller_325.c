@@ -389,11 +389,11 @@ printf("%s", response);
 
 /*
  * LISTPROC is a multi-part response.
- * Continue receiving until END SID:9100 arrives.
+ * Continue receiving until END SID:5233 arrives.
  */
 if (strncmp(buffer, "LISTPROC", 8) == 0)
 {
-    while (strstr(response, "END SID:9100") == NULL)
+    while (strstr(response, "END SID:5233") == NULL)
     {
         memset(response, 0, sizeof(response));
 
