@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -464,6 +463,37 @@ if (strncmp(buffer, "MONITOR START ", 14) == 0)
 }
 
 /* ===== MONITOR STOP ===== */
+
+
+
+/* ===== QUIT COMMAND ===== */
+if (strcmp(buffer, "QUIT") == 0)
+{
+    if (send(sockfd,
+             buffer,
+             strlen(buffer),
+             0) < 0)
+    {
+        perror("send");
+        break;
+    }
+
+    memset(response, 0, sizeof(response));
+
+    ssize_t quit_received =
+        recv(sockfd,
+             response,
+             sizeof(response) - 1,
+             0);
+
+    if (quit_received > 0)
+    {
+        response[quit_received] = '\0';
+        printf("%s", response);
+    }
+
+    break;
+}
 
 if (strcmp(buffer, "MONITOR STOP") == 0)
 {

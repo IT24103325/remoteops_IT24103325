@@ -12,12 +12,48 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <time.h>
 
 #define PORT 9410
 #define UDP_PORT 9510
 #define AUTH_TOKEN "OPS-3325"
 #define SID "5233"
 #define BUFFER_SIZE 1024
+
+void write_log(const char *client_ip, const char *command)
+{
+    FILE *log_file;
+    time_t now;
+    struct tm *time_info;
+    char timestamp[64];
+
+    now = time(NULL);
+    time_info = localtime(&now);
+
+    strftime(timestamp,
+             sizeof(timestamp),
+             "%Y-%m-%d %H:%M:%S",
+             time_info);
+
+    log_file = fopen("remoteops_IT24103325.log", "a");
+
+    if (log_file == NULL)
+    {
+        perror("log file");
+        return;
+    }
+
+    fprintf(log_file,
+            "[%s] CLIENT:%s COMMAND:%s SID:%s\n",
+            timestamp,
+            client_ip,
+            command,
+            SID);
+
+    fclose(log_file);
+}
+
+
 
 struct monitor_info
 {
@@ -224,10 +260,33 @@ void *handle_client(void *arg)
 
         buffer[bytes_received] = '\0';
 
+       /*
+ * Authentication is required before any command
+ * except AUTH.
+ */
+if (!authenticated &&
+    strncmp(buffer, "AUTH ", 5) != 0)
+{
+    char response[BUFFER_SIZE];
+
+    snprintf(response,
+             sizeof(response),
+             "ERR 002 AUTH_REQUIRED SID:%s\n",
+             SID);
+
+    send(connfd,
+         response,
+         strlen(response),
+         0);
+
+    continue;
+}
+
         /* Remove newline from received command */
         buffer[strcspn(buffer, "\r\n")] = '\0';
 
         printf("Received: %s\n", buffer);
+        write_log(client_ip, buffer);
 
 
         /* AUTH command */
@@ -266,6 +325,25 @@ void *handle_client(void *arg)
                      0);
             }
         }
+
+else if (strcmp(buffer, "QUIT") == 0)
+{
+    char response[BUFFER_SIZE];
+
+    snprintf(response,
+             sizeof(response),
+             "OK BYE SID:%s\n",
+             SID);
+
+    send(connfd,
+         response,
+         strlen(response),
+         0);
+
+    break;
+}
+
+
 else if (strcmp(buffer, "SYSINFO") == 0)
 {
     char response[BUFFER_SIZE];
@@ -777,7 +855,7 @@ if (sscanf(buffer,
 
     snprintf(save_path,
          sizeof(save_path),
-         "uploads/%s",
+         "agentfiles/IT24103325/%s",
          filename);
     FILE *file = fopen(save_path, "wb");
 
@@ -937,7 +1015,7 @@ if (strcmp(ready_buffer, "READY") != 0)
 
     snprintf(filepath,
              sizeof(filepath),
-             "uploads/%s",
+             "agentfiles/IT24103325/%s",
              filename);
 
     file = fopen(filepath, "rb");
@@ -1052,25 +1130,24 @@ else if (strncmp(buffer, "MONITOR START ", 14) == 0)
     int udp_port;
 
     if (sscanf(buffer,
-               "MONITOR START %d",
-               &udp_port) != 1 ||
-        udp_port < 1 ||
-        udp_port > 65535)
-    {
-        char response[BUFFER_SIZE];
+           "MONITOR START %d",
+           &udp_port) != 1 ||
+    udp_port != UDP_PORT)
+{
+    char response[BUFFER_SIZE];
 
-        snprintf(response,
-                 sizeof(response),
-                 "ERR 003 UNKNOWN_COMMAND SID:%s\n",
-                 SID);
+    snprintf(response,
+             sizeof(response),
+             "ERR 003 UNKNOWN_COMMAND SID:%s\n",
+             SID);
 
-        send(connfd,
-             response,
-             strlen(response),
-             0);
+    send(connfd,
+         response,
+         strlen(response),
+         0);
 
-        continue;
-    }
+    continue;
+}
 
     if (monitor_running)
     {
@@ -1176,9 +1253,6 @@ else if (strcmp(buffer, "MONITOR STOP") == 0)
          strlen(response),
          0);
 }
-
-
-
 
 
 
