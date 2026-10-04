@@ -1,8 +1,10 @@
 agent_325
 controller_325
-*.o
-agent_019
-controller_019
-uploads/
-downloaded_*
-upload_test.txt
+
+*_broken.c
+*_before_*.c
+
+downloaded_*.txt
+
+remoteops_IT24103325.log
+agentfiles/
