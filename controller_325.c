@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 
 #define PORT 9410
+#define UDP_PORT 9510
 
 int main()
 {
@@ -359,6 +360,109 @@ if (strncmp(buffer, "GET ", 4) == 0)
 
     continue;
 }
+
+
+/* ===== MONITOR STARTS HERE ===== */
+
+if (strncmp(buffer, "MONITOR ", 8) == 0)
+{
+    int seconds;
+
+    if (sscanf(buffer, "MONITOR %d", &seconds) != 1 ||
+        seconds <= 0 ||
+        seconds > 60)
+    {
+        printf("Usage: MONITOR <seconds> (1-60)\n");
+        continue;
+    }
+
+    int udp_sock = socket(AF_INET, SOCK_DGRAM, 0);
+
+    if (udp_sock < 0)
+    {
+        perror("UDP socket");
+        continue;
+    }
+
+    struct sockaddr_in udp_addr;
+
+    memset(&udp_addr, 0, sizeof(udp_addr));
+
+    udp_addr.sin_family = AF_INET;
+    udp_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    udp_addr.sin_port = htons(UDP_PORT);
+
+    if (bind(udp_sock,
+             (struct sockaddr *)&udp_addr,
+             sizeof(udp_addr)) < 0)
+    {
+        perror("UDP bind");
+        close(udp_sock);
+        continue;
+    }
+
+    /* Send MONITOR command through TCP */
+    if (send(sockfd,
+             buffer,
+             strlen(buffer),
+             0) < 0)
+    {
+        perror("send");
+        close(udp_sock);
+        break;
+    }
+
+    /* Receive TCP acknowledgement */
+    memset(response, 0, sizeof(response));
+
+    ssize_t monitor_received =
+        recv(sockfd,
+             response,
+             sizeof(response) - 1,
+             0);
+
+    if (monitor_received <= 0)
+    {
+        printf("Agent disconnected.\n");
+        close(udp_sock);
+        break;
+    }
+
+    response[monitor_received] = '\0';
+    printf("%s", response);
+
+    /* Receive UDP monitoring messages */
+    for (int i = 0; i < seconds; i++)
+    {
+        char udp_buffer[256];
+
+        memset(udp_buffer, 0, sizeof(udp_buffer));
+
+        ssize_t udp_received =
+            recvfrom(udp_sock,
+                     udp_buffer,
+                     sizeof(udp_buffer) - 1,
+                     0,
+                     NULL,
+                     NULL);
+
+        if (udp_received < 0)
+        {
+            perror("recvfrom");
+            break;
+        }
+
+        udp_buffer[udp_received] = '\0';
+
+        printf("[UDP] %s\n", udp_buffer);
+    }
+
+    close(udp_sock);
+    continue;
+}
+
+/* ===== MONITOR ENDS HERE ===== */
+
 
     if (send(sockfd,
              buffer,
