@@ -1077,7 +1077,7 @@ if (strcmp(ready_buffer, "READY") != 0)
     /* Tell Controller how many bytes are coming */
     snprintf(response,
              sizeof(response),
-             "OK GET %s %ld SID:%s\n",
+             "OK FILE_SEND %s %ld SID:%s\n",
              filename,
              file_size,
              SID);

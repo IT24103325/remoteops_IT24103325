@@ -10,6 +10,35 @@
 #define PORT 9410
 #define UDP_PORT 9510
 
+
+int recv_line(int sockfd, char *buf, size_t size)
+{
+    size_t i = 0;
+
+    while (i < size - 1)
+    {
+        char c;
+
+        ssize_t n = recv(sockfd, &c, 1, 0);
+
+        if (n <= 0)
+        {
+            return -1;
+        }
+
+        buf[i++] = c;
+
+        if (c == '\n')
+        {
+            break;
+        }
+    }
+
+    buf[i] = '\0';
+
+    return (int)i;
+}
+
 int main()
 {
     int sockfd;
@@ -129,23 +158,20 @@ while (1)
     /*
      * Wait until Agent says READY.
      */
-    memset(response, 0, sizeof(response));
+memset(response, 0, sizeof(response));
 
-    ssize_t bytes_received =
-        recv(sockfd,
-             response,
-             sizeof(response) - 1,
-             0);
+int bytes_received =
+    recv_line(sockfd,
+              response,
+              sizeof(response));
 
-    if (bytes_received <= 0)
-    {
-        printf("Agent disconnected.\n");
-        fclose(file);
-        break;
-    }
+if (bytes_received <= 0)
+{
+    printf("Agent disconnected.\n");
+    break;
+}
 
-    response[bytes_received] = '\0';
-
+response[bytes_received] = '\0';
     if (strncmp(response, "READY", 5) != 0)
     {
         printf("%s", response);
@@ -231,9 +257,7 @@ if (strncmp(buffer, "GET ", 4) == 0)
 {
     char filename[256];
 
-    if (sscanf(buffer,
-               "GET %255s",
-               filename) != 1)
+    if (sscanf(buffer, "GET %255s", filename) != 1)
     {
         printf("Usage: GET <filename>\n");
         continue;
@@ -256,12 +280,10 @@ if (strncmp(buffer, "GET ", 4) == 0)
      */
     memset(response, 0, sizeof(response));
 
-    ssize_t bytes_received =
-        recv(sockfd,
-             response,
-             sizeof(response) - 1,
-             0);
-
+int bytes_received =
+    recv_line(sockfd,
+              response,
+              sizeof(response));
     if (bytes_received <= 0)
     {
         printf("Agent disconnected.\n");
@@ -279,13 +301,20 @@ if (strncmp(buffer, "GET ", 4) == 0)
         continue;
     }
 
+    /*
+     * Expected:
+     * OK FILE_SEND <filename> <filesize> SID:<sid>
+     */
     long file_size;
+    char received_filename[256];
 
     if (sscanf(response,
-               "OK GET %*s %ld",
-               &file_size) != 1)
+               "OK FILE_SEND %255s %ld",
+               received_filename,
+               &file_size) != 2)
     {
-        printf("Invalid GET response from Agent.\n");
+        printf("Invalid GET response from Agent: %s",
+               response);
         continue;
     }
 
@@ -359,7 +388,7 @@ if (strncmp(buffer, "GET ", 4) == 0)
 
     continue;
 }
-
+   /* GET ENDS HERE */
 
 /* ===== MONITOR STARTS HERE ===== */
 
